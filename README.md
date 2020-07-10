@@ -47,13 +47,8 @@ preserved.
 
 <pre> 
 
-1. Make  the application respect the formatting  tags (such  as  markdown tabs).
-This can work either by using  an additional flag argument or by checking  input
-file extention. 
-
-2. Include cross-platform file locking to make sure two input file names are not
-referring to the  same file  (to  prevent  accidental data loss).  Alternatively
-include "-u" flag to update (overwrite) the only input file specified. 
+Make the application respect the formatting  tags (such  as markdown tabs). This 
+can work either by using  an additional flag argument or by checking  input file extention. 
 
 </pre> 
 
