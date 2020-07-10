@@ -38,17 +38,142 @@ struct AutoClose // RAII structure to close file automatically
         if (fp) { fclose (fp); }
         if (out) { fclose (out); }
     }
-    void flush ()
+    void closeFiles ()
     {
         if (out) fflush (out);
+
+        if (fp) { fclose (fp); }
+        if (out) { fclose (out); }
+
+        fp = out = nullptr;
     }
 };
 
+struct ProgArgs
+{
+    char *inputFile;
+    char *outputFile;
+    bool update;
+    bool overwrite;
+    int width;
+    ProgArgs ()
+    {
+        inputFile = outputFile = nullptr;
+        update = overwrite = false;
+        width = 80;
+    }
+    ~ProgArgs ()
+    {
+        free (inputFile);
+        free (outputFile);
+    }
+    void printSyntax ()
+    {
+        printf ("syntax: justify [-f -u -wLINE_WIDTH] inputFile.txt [outputFile.txt] \n");
+        printf ("\t -f - overwrite existing outputFile.txt \n");
+        printf ("\t -u - update inputFile.txt \n");
+        printf ("\t -wLINE_WIDTH - optional line width. Dafault is 80 \n");
+    }
+
+    bool parseArguments (int argc, char *argv[])
+    {
+        if (argc < 3)
+        {
+            return false;
+        }
+
+        int first_file_arg = -1;
+
+        for (int i = 1; i < argc; i++)
+        {
+            char *arg = argv[i];
+
+            if (*arg == '-')
+            {
+                if ((i > first_file_arg) && (first_file_arg > 0))
+                {
+                    // incorrect argument sequence.
+                    return false;
+                }
+
+                if (strcasecmp (arg, "-u") == 0)
+                {
+                    update = true;
+                }
+                else if (strcasecmp (arg, "-f") == 0)
+                {
+                    overwrite = true;
+                }
+                else if (strncasecmp (arg, "-w", 2) == 0)
+                {
+                    width = atoi (arg + 2);
+
+                    if (width <= 40 || width > 1024)
+                    {
+                        fprintf (stderr, "Cannot set line width to %d.\n", width);
+                        if (width > 0)
+                        {
+                            fprintf (stderr, "Use values between 40 and 1024\n");
+                        }
+
+                        return false;
+                    }
+                }
+                else 
+                {
+                    fprintf (stderr, "Unknown parameter: %s\n", arg);
+                    return false;
+                }
+            }
+            else // file names
+            {
+                if (first_file_arg < 0)
+                    first_file_arg = i;
+
+                if (!inputFile) 
+                    inputFile = strdup (arg);
+                else 
+                    outputFile = strdup (arg);
+            } 
+        }
+        if (inputFile == NULL)
+        {
+            fprintf (stderr, "No input file. \n");
+            return false;
+        }
+        if (outputFile == NULL && update == false)
+        {
+            fprintf (stderr, "No output file name give. Use -u option to overwrite. \n");
+            return false;
+        }
+        if (outputFile && update)
+        {
+            fprintf (stderr, "Extra parameter given with -u option. \n");
+            return false;
+        }
+        if (overwrite && update)
+        {
+            fprintf (stderr, "Flags -f and -u cannot be used together. \n");
+            return false;
+        }
+
+        return true;
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////
+// justify -u Filename.txt
+// justify -f -w70 Filename.old Filename.new (-f force overwrite)
+////////////////////////////////////////////////////////////////////////////
+
 int main (int argc, char *argv[])
 {
-    if (argc < 3)
+    ProgArgs prog_args;
+
+    if (!prog_args.parseArguments (argc, argv))
     {
-        printf ("syntax: justify inputFile.txt outputFile.txt [number]\n");
+        prog_args.printSyntax();
+
         return EXIT_SUCCESS;
     }
 
@@ -56,19 +181,8 @@ int main (int argc, char *argv[])
 
     setlocale(LC_ALL, "");
 
-    const char *inFile = argv[1];
-    const char *outFile = argv[2]; 
-
-    /* Opening file in write mode will delete all of its content. 
-    We want to avoid having this when input and output are the same, 
-    so this is for data safety (a better solution would involve file locking). 
-    */
-
-    if (strcmp (inFile, outFile) == 0)
-    {
-        fprintf (stderr, "Input and output files cannot be the same.\n");
-        return EXIT_FAILURE;
-    }
+    const char *inFile = prog_args.inputFile;
+    const char *outFile = prog_args.outputFile;
 
     int errNo = fopen_s (&ac.fp, inFile, READ_MODE);
 
@@ -80,7 +194,17 @@ int main (int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    errNo = fopen_s (&ac.out, outFile, WRITE_MODE);
+    char temp_file_name[PATH_MAX];
+
+    memset (temp_file_name, 0, PATH_MAX);
+
+    if (0 != tmpnam_s (temp_file_name, PATH_MAX))
+    {
+        fprintf (stderr, "Unexpected error creating temp file name.\n");
+        return EXIT_FAILURE;
+    }
+
+    errNo = fopen_s (&ac.out, temp_file_name, WRITE_MODE);
 
     if (!ac.out)
     {
@@ -90,22 +214,9 @@ int main (int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    int _limit = 80;
+    int _limit = prog_args.width;
 
-    if (argc == 4)
-    {
-        int width = atoi (argv[3]);
-        if (width <= 0 || width < 40 || width > 1024)
-        {
-            fprintf (stderr, "Cannot set line width: %s\n", argv[3]);
-            fprintf (stderr, "Using default width : %d\n", _limit);
-        }
-        else 
-        {
-            _limit = width;
-            printf ("Using line width %d\n", _limit);
-        }
-    }
+    printf ("Using line width %d\n", _limit);
 
     srand(100);
 
@@ -128,7 +239,40 @@ int main (int argc, char *argv[])
 
     delete[] buffer;
 
-    ac.flush();
+    ac.closeFiles ();
+
+    int renameRet = 0;
+
+    if (prog_args.update) 
+    {
+        remove (inFile);
+        renameRet = rename (temp_file_name, inFile);
+    }
+    else if (prog_args.overwrite)
+    {
+        remove (outFile);
+        renameRet = rename (temp_file_name, outFile);
+    }
+    else 
+    {
+        if (access (outFile, F_OK) != -1)
+        {
+            fprintf (stderr, "File %s already exists. Use -f flag to overwrite. \n", outFile);
+            remove (temp_file_name);
+
+            return EXIT_FAILURE;
+        }
+
+        renameRet = rename (temp_file_name, outFile);
+    }
+
+    if (renameRet != 0)
+    {
+        perror( "Error renaming temporary file: ");
+        remove (temp_file_name); // cleanup
+
+        return EXIT_FAILURE;
+    }
 
     printf ("Justified successfully\n");
 

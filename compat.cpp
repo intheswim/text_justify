@@ -10,6 +10,7 @@
  */
 
 #include "compat.h"
+#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
@@ -57,6 +58,31 @@ int wcscpy_s( wchar_t * dest, size_t dest_len, const wchar_t * src)
         return ERANGE;
 
     wcscpy (dest, src);
+
+    return 0;
+}
+
+int tmpnam_s(char* temp_name, size_t sizeInChars)
+{
+    char buffer [PATH_MAX] ;
+
+    if (NULL == tmpnam(buffer))
+        return -1; 
+
+  /*  if (strlen (mktemp (buffer)) == 0)
+        return errno;  */
+
+    if (strlen (buffer) >= sizeInChars)
+    {
+        return ERANGE;
+    }
+
+    if (temp_name == NULL)
+    {
+        return EINVAL;
+    }
+
+    strcpy (temp_name, buffer);
 
     return 0;
 }

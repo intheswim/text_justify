@@ -13,11 +13,15 @@ inserting spaces) using predefined (equal to 80) or supplied line width.
 
 <pre> 
 
-`Syntax: ./justify infile.txt outfile.txt [line_width]` 
+`Syntax: ./justify [-f -u -wLINE_WIDTH] infile.txt outfile.txt` 
 
-Example: 
+Examples: 
 
-`./justify README.md README_70.md 70` 
+`./justify -w70 README.md README_70.md`
+
+`./justify -u -w70 README.md` (updates README.md to use 70 as line width)
+
+`./justify -f -w70 README.md README_70.md` (overwrite README_70.md if present)
 
 It  inserts  spaces to justify text (to make every but the very last line in any
 paragraph use the same number  of characters. Note that it will leave unmodified

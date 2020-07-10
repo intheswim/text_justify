@@ -224,6 +224,8 @@ static void splitAndWrite (struct headerAndBuffer & ob, FILE *out, const int LIM
     bool last_space = false;
     int last_space_index = -1;
 
+    // could have used strtok for this.
+
     for (int i = 0; i <= len; i++)
     {
         if (buffer[i] == 0 && (i - last_space_index > 1))
