@@ -48,7 +48,8 @@ preserved.
 <pre> 
 
 Make the application respect the formatting  tags (such  as markdown tabs). This 
-can work either by using  an additional flag argument or by checking  input file extention. 
+can work either by using  an additional flag argument or by checking  input file
+extention. 
 
 </pre> 
 
